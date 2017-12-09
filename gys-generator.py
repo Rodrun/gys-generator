@@ -14,6 +14,8 @@ if you appended this to "flightclub.com/", you'd get to the Air Jordan 1 catalog
 "exclude_list" : List of exclude tags strings. Exclude tags are strings to look for in shoe names. If an exclude tag is
 found in a shoe name, that shoe will not have a file generated for it. For example, if "Retro" is found in a shoe name,
 the shoe will be skipped. Note that this is case insensitive.
+
+"start" : Starting file number.
 """
 import ast
 import re
@@ -125,7 +127,7 @@ class ShoePair:
         :return: Shoe image URL.
         """
         soup = BSoup(bs.html, "html.parser")
-        elem = ShoePair._evaluate_soup_select(soup, "img[class='product-img']")
+        elem = ShoePair._evaluate_soup_select(soup, "div[class='result-thumbnail'] > img")
         ret_str = NULL_IMAGE_STRING if elem is None else elem["src"]
         soup.decompose() # Destroy
         return ret_str
@@ -211,13 +213,14 @@ def get_impressions_list(bsoup : BSoup):
     return [{"name": "NULL"}]
 
 
-def create_execution_file(name: str, site: str, dir: str, exclude_list: list) -> None:
+def create_execution_file(name: str, site: str, dir: str, exclude_list: list, start: int) -> None:
     """
     Create an execution JSON file. This file is read and used to generate shoe files.
     :param name: Name of generation file.
     :param site: Directory of flightclub.com to use.
     :param dir: Directory to place shoe files.
     :param exclude_list: List of exclude tags.
+    :param start: Starting file number.
     :return: Nothing.
     """
     file = open(name, "w")
@@ -225,7 +228,8 @@ def create_execution_file(name: str, site: str, dir: str, exclude_list: list) ->
         {
             "site": site,
             "dir": dir,
-            "exclude_list": exclude_list
+            "exclude_list": exclude_list,
+            "start": start
         },
         file
     )
@@ -250,20 +254,14 @@ def read_execution_file(path: str) -> [str, dict]:
     excludelist_check = False
     if isinstance(loaded, dict):
         # Check for required values
-        if "site" in loaded:
-            site_check = True
-        if "dir" in loaded:
-            dir_check = True
-        if "exclude_list" in loaded:
-            excludelist_check = True
-
-        # Alert for any missing required values
-        if not site_check:
+        if "site" not in loaded:
             return "Missing site value", None
-        if not dir_check:
+        if "dir" not in loaded:
             return "Missing dir value", None
-        if not excludelist_check:
+        if "exclude_list" not in loaded:
             return "Missing exclude_list value", None
+        if "start" not in loaded:
+            return "Missing start value", None
     else: # Is not a dictionary!
         return "Loaded JSON should be a dict ( {} )!", None
     # Success
@@ -288,7 +286,12 @@ def prompt_execution_values() -> None:
         exclude_list = ast.literal_eval("[" +
                                         str(input("List of exclude tags (separated by comma, requires quotations): "))
                                         + "]")
-    create_execution_file(ej_name, site, dir, exclude_list)
+    try:
+        start = int(input("Starting file number: "))
+    except TypeError:
+        print_warn("Invalid value, defaulting to 1")
+        start = 1
+    create_execution_file(ej_name, site, dir, exclude_list, start)
 
 
 def execute() -> None:
@@ -319,7 +322,7 @@ def execute() -> None:
         req.raise_for_status()
         list_soup = BSoup(req.text, "html.parser")
         print_info("Starting generation...")
-        create_all_files(str(loaded["dir"]), get_impressions_list(list_soup), loaded["exclude_list"])
+        create_all_files(str(loaded["dir"]), get_impressions_list(list_soup), loaded["exclude_list"], loaded["start"])
 
 
 # ############################### Our godly call ############################### #
