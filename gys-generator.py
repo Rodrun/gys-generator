@@ -97,8 +97,17 @@ class ShoePair:
         :return: Browser object with current link at the shoe page.
         """
         # Search
+        print_info("Searching for {}".format(id))
         browser = Browser(headless=headless) # Defaults to firefox
         browser.visit(BASE_SEARCH_SITE + id)
+        bes = BSoup(browser.html, "html.parser")
+        a_elements = bes.find_all("a")
+        for aelem in a_elements:
+            if "-" + id in aelem["href"]:
+                nbrowser = Browser(headless=headless)
+                nbrowser.visit(aelem["href"])
+                browser.quit()
+                return nbrowser
         return browser
 
     @staticmethod
@@ -112,7 +121,6 @@ class ShoePair:
         :return: The first element of select(), otherwise None.
         """
         elem = beautiful.select(tag)
-        print(elem)
         if len(elem) == 0:
             return None
         return elem[0]
@@ -127,7 +135,8 @@ class ShoePair:
         :return: Shoe image URL.
         """
         soup = BSoup(bs.html, "html.parser")
-        elem = ShoePair._evaluate_soup_select(soup, "div[class='result-thumbnail'] > img")
+        elem = ShoePair._evaluate_soup_select(soup,
+                                              "div[class='product-image product-img-box'] > img[class='product-img']")
         ret_str = NULL_IMAGE_STRING if elem is None else elem["src"]
         soup.decompose() # Destroy
         return ret_str
@@ -140,7 +149,7 @@ class ShoePair:
         :return: Name of shoe.
         """
         soup = BSoup(bs.html, "html.parser")
-        sel_element = ShoePair._evaluate_soup_select(soup, "p[class='result-title text-ellipsis']")
+        sel_element = ShoePair._evaluate_soup_select(soup, "div[class='mb-padding product-name hidden-phone'] > h1")
         ret_str = NULL_NAME_STRING if sel_element is None else sel_element.text
         soup.decompose()
         return ret_str
@@ -158,7 +167,7 @@ def create_shoe_pair(idobj, excludetags: list) -> ShoePair:
         if re.search(etag, name, re.IGNORECASE):
             print_info("Excluding '{}', found with tag {}".format(name, etag))
             return None
-    return ShoePair(name, excludetags)
+    return ShoePair(idobj["id"], excludetags)
 
 
 def create_all_files(directory: str, shoelist: list, excludetags: list=[], startnum: int = 1) -> None:
